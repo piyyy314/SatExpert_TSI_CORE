@@ -137,6 +137,39 @@ class AudioController {
   }
 
   /**
+   * General tactical beep at custom frequency
+   */
+  public playBeep(freq: number = 880, type: OscillatorType = 'sine', duration: number = 0.08) {
+    if (this.isMuted) return;
+    this.initCtx();
+
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.ctx!.currentTime);
+
+    gain.gain.setValueAtTime(0.08, this.ctx!.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx!.currentTime + duration);
+
+    osc.connect(gain);
+    gain.connect(this.ctx!.destination);
+
+    osc.start();
+    osc.stop(this.ctx!.currentTime + duration);
+  }
+
+  /**
+   * Double chirp for successful verification or execution
+   */
+  public playDoubleChirp() {
+    this.playBeep(880, 'triangle', 0.06);
+    setTimeout(() => {
+      this.playBeep(1320, 'triangle', 0.08);
+    }, 80);
+  }
+
+  /**
    * Tactical Voice Alerts
    */
   public playSystemVoice(message: string) {

@@ -52,6 +52,7 @@ import { QuantumDecryptor } from '../components/QuantumDecryptor.tsx';
 import { BiometricScanner } from '../components/BiometricScanner.tsx';
 import { TacticalScriptEnv } from '../components/TacticalScriptEnv.tsx';
 import { RemoteAccessTerminal } from '../components/RemoteAccessTerminal.tsx';
+import { SystemDiagnostics } from '../components/SystemDiagnostics.tsx';
 import { audioController } from '../services/audioService.ts';
 import { Coordinates, Satellite, LookAngles, WeatherCondition, MainView, SatelliteStatus, TacticalEvent } from './types.ts';
 import { COMMON_SATELLITES } from './constants.ts';
@@ -254,7 +255,7 @@ export const App: React.FC = () => {
     { name: 'TACTICAL_BASE', views: ['tactical', 'constellation', 'satellite_detail', 'mesh', 'weather', 'geolocator'] },
     { name: 'SIGINT_SUITE', views: ['intelligence', 'interception', 'node_scanner', 'spoof_tracer', 'threat_dossier', 'yara_scanner', 'sniffer', 'analyzer', 'specter', 'traps', 'radio_intercept', 'quantum_decryptor', 'biometric_scanner'] },
     { name: 'ACTIVE_OPS', views: ['tactical_suite', 'warfare', 'planner', 'neural', 'orbital_strike', 'drone_swarm', 'kill_chain', 'cyber_attack', 'signal_jamming', 'botnet_command', 'script_env', 'remote_access'] },
-    { name: 'CYBER_CMD', views: ['defense', 'simulation', 'aegis', 'usb_manager', 'vsat_config', 'grover'] },
+    { name: 'CYBER_CMD', views: ['defense', 'simulation', 'aegis', 'usb_manager', 'vsat_config', 'grover', 'diagnostics'] },
     { name: 'AUX_DATA', views: ['media', 'live', 'calculations', 'terrain', 'news'] }
   ];
 
@@ -574,6 +575,16 @@ export const App: React.FC = () => {
 
             {view === 'remote_access' && (
               <RemoteAccessTerminal addMissionLog={addMissionLog} />
+            )}
+
+            {view === 'diagnostics' && (
+              <SystemDiagnostics 
+                userLoc={userLoc} 
+                selectedSat={selectedSat} 
+                defcon={defcon} 
+                isStealthMode={isStealthMode} 
+                addMissionLog={addMissionLog} 
+              />
             )}
 
             {view === 'defense' && (

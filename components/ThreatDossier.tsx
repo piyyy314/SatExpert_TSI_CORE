@@ -668,7 +668,7 @@ export const ThreatDossier: React.FC = () => {
                                       animate={{ 
                                         opacity: [0.05, 0.2, 0.05],
                                         scale: [0.98, 1.02, 0.98],
-                                        backgroundColor: i % 5 === 0 ? 'rgba(239, 68, 68, 0.08)' : 'transparent'
+                                        backgroundColor: i % 5 === 0 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(0, 0, 0, 0)'
                                       }}
                                       transition={{ duration: 5 + Math.random() * 3, repeat: Infinity }}
                                       className="border border-white/5 rounded-xl shadow-inner"

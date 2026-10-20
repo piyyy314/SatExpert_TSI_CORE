@@ -44,7 +44,12 @@
 * **YARA Firmware Scanner**: Heuristic malware scanning against VSAT terminal firmware and modems.
 * **Threat Dossier & Hardening Engine**: Real-time status, CVE remediation tracking, and one-click strategic hardening workflows.
 
-### 4. Edge Proxy & WAF Hardening
+### 4. System Diagnostics & Hardware Verification
+* **Hardware & SDR Bus Monitor**: Live status, latency, and loopback verification across bladeRF 2.0 micro, HackRF One, and STM32 BUC controllers.
+* **Cryptographic Co-Processor Diagnostics**: In-memory test vectors and lattice validation for NIST ML-DSA-65 (Dilithium) crypto engines.
+* **Interactive Loopback Self-Test**: 1-click comprehensive system self-test verifying all 8 critical communication channels, FIFO buffers, and phase-lock clocks.
+
+### 5. Edge Proxy & WAF Hardening
 * **Apache HTTPD Baseline**: Enforces Apache HTTPD `2.4.58+` to eradicate CVE-2021-41773 & CVE-2021-42013 directory traversal vulnerabilities. Disables extraneous modules (`mod_proxy_uwsgi`).
 * **Squid Proxy Auditing**: Enforces Squid `5.x` or latest `4.15+` security release, resolving CVE-2020-15049 (Request Smuggling) and CVE-2020-25097 (Header Smuggling) with strict ACL verification.
 * **Web Application Firewall (WAF)**: Active header injection protection, request normalization, and proxy boundary defense.
