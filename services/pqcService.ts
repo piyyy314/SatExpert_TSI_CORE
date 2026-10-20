@@ -32,12 +32,7 @@ export const signCanaryToken = (trapMetadata: string, secretKey: Uint8Array) => 
 
 export const verifyCanaryToken = (publicKey: Uint8Array, trapMetadata: string, signature: Uint8Array) => {
   const msg = new TextEncoder().encode(trapMetadata);
-  try {
-    return ml_dsa65.verify(signature, msg, publicKey);
-  } catch(e) {
-    console.error("Signature verification failed:", e);
-    return false;
-  }
+  return ml_dsa65.verify(msg, signature, publicKey);
 };
 
 export const bytesToHex = (bytes: Uint8Array) => {

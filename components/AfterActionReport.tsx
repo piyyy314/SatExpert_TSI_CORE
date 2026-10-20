@@ -31,16 +31,23 @@ const INITIAL_ACTIONS: ActionRecord[] = [
   {
     timestamp: '2026-04-26 05:35:58',
     category: 'VULNERABILITY',
-    description: 'Vulnerability scan completed. High risk identified in protocol stack.',
+    description: 'Protocol Stack & Web Server Assessment',
     status: 'CRITICAL',
-    details: 'CVE-2021-25216 (BIND GSS-TSIG), CVE-2020-8622 (SIG Query DoS).'
+    details: 'Apache HTTPD updated to 2.4.58+; unneeded mod_proxy_uwsgi disabled. CVE-2021-41773 & 42013 remediated.'
   },
   {
     timestamp: '2026-04-26 06:10:12',
     category: 'VULNERABILITY',
-    description: 'Squid Proxy Assessment',
-    status: 'WARNING',
-    details: 'Vulnerable to CVE-2020-15049 and CVE-2020-25097.'
+    description: 'Squid Proxy & Edge Gateway Assessment',
+    status: 'SUCCESS',
+    details: 'Squid Proxy upgraded to 5.9+ / 4.15+ release. ACL configuration audited and hardened against bypasses.'
+  },
+  {
+    timestamp: '2026-04-26 06:45:00',
+    category: 'SYSTEM',
+    description: 'Web Application Firewall (WAF) Deployment',
+    status: 'SUCCESS',
+    details: 'Active WAF rules engaged to mitigate HTTP header injection and request smuggling vectors.'
   },
   {
     timestamp: '2026-04-26 07:15:22',
@@ -123,11 +130,12 @@ export const AfterActionReport: React.FC = () => {
 
     doc.setFontSize(10);
     const mitigations = [
-      '• Upgrade ISC BIND to 9.18.x+ to resolve GSS-TSIG overflow.',
-      '• Patch Squid Proxy to version 4.13 or higher.',
-      '• Restrict Port 2000 via hardware firewall; implement mTLS.',
-      '• Deploy active monitoring on all flagged shell uplinks.',
-      '• Rotate all credentials discovered in VFS layer exploration.'
+      '• Upgrade Apache HTTPD to version >= 2.4.58; disable mod_proxy_uwsgi.',
+      '• Update Squid Proxy to version 5.x or latest 4.15+ security release.',
+      '• Audit Squid ACL configurations to eliminate bypass vectors.',
+      '• Deploy Web Application Firewall (WAF) to neutralize header injection & smuggling.',
+      '• Upgrade ISC BIND to 9.18.x+ and restrict Port 2000 via mTLS hardware firewall.',
+      '• Rotate all credentials and enforce Post-Quantum Dilithium/Kyber authentication.'
     ];
     mitigations.forEach((text, i) => {
       doc.text(text, 14, finalY + 12 + (i * 7));

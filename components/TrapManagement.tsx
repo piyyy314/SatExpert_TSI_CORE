@@ -205,7 +205,7 @@ export const TrapManagement: React.FC = () => {
                                 }`}
                               >
                                 <span className="text-[9px] font-black uppercase tracking-[0.2em]">
-                                  {verificationResult.success ? '✓ VERIFIED CANARY SIG // PQC_SECURE' : '✗ SIGNATURE_INVALID_TAMPER_DETECTED'}
+                                  {verificationResult.success ? '✓ SIGNATURE_VERIFIED_PQC_SECURE' : '✗ SIGNATURE_INVALID_TAMPER_DETECTED'}
                                 </span>
                               </motion.div>
                             )}

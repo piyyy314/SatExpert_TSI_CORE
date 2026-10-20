@@ -57,9 +57,9 @@ export const ThreatDossier: React.FC = () => {
       artifacts: ['Telnet Cleartext', 'CVE-2021-41773', 'Apache 2.4.41', 'FTP 3.0.3'],
       status: 'TRACKING',
       mitigations: [
-        'Terminate Telnet service immediately; replace with SSH.',
-        'Update Apache httpd to latest stable release (Patch CVE-2021-41773/42013).',
-        'Enforce TLS for FTP or transition to SFTP.'
+        'Terminate Telnet service immediately; replace with OpenSSH 9.3p1 (Ed25519).',
+        'Upgrade Apache HTTPD to version >= 2.4.58 with mod_proxy_uwsgi disabled.',
+        'Enforce TLS 1.3 for all payload transmissions.'
       ]
     },
     {
@@ -91,6 +91,23 @@ export const ThreatDossier: React.FC = () => {
         'Disable UART bridge at 0x82 physically or via BIOS lock.',
         'Rotate all cryptographic keys associated with this node.'
       ]
+    },
+    {
+      id: 'TR-1032',
+      name: 'Edge Reverse Proxy & Gateway Stack',
+      target: '10.254.0.1 (SatCom Edge)',
+      risk: 'CRITICAL',
+      description: 'Audit detected outdated Squid Proxy (<5.x / <4.15) vulnerable to ACL bypasses (CVE-2020-15049 / 25097), Apache HTTPD <2.4.58 with unneeded mod_proxy_uwsgi enabled, and missing WAF rules against HTTP header injection & request smuggling.',
+      timestamp: new Date().toISOString(),
+      artifacts: ['Squid ACL Bypass Audit', 'Apache HTTPD <2.4.58', 'mod_proxy_uwsgi Active', 'Header Injection Vector', 'HTTP Smuggling Risk'],
+      status: 'TRACKING',
+      mitigations: [
+        'Upgrade Apache HTTPD to version >= 2.4.58 immediately.',
+        'Disable unneeded modules in Apache including mod_proxy_uwsgi.',
+        'Upgrade Squid Proxy to version 5.x or latest 4.15+ security release.',
+        'Audit Squid configuration and strict ACLs to eliminate bypasses.',
+        'Implement Web Application Firewall (WAF) to neutralize header injection & smuggling.'
+      ]
     }
   ]);
 
@@ -105,7 +122,8 @@ export const ThreatDossier: React.FC = () => {
     setIsAnalyzing(true);
     const result = await analyzePortScan(selectedRecord.target, [
       { port: 23, service: 'telnet' },
-      { port: 80, service: 'http', version: 'Apache 2.4.41' },
+      { port: 80, service: 'http', version: 'Apache 2.4.58' },
+      { port: 3128, service: 'squid', version: 'Squid 5.9' },
       { port: 21, service: 'ftp', version: 'vsftpd 3.0.3' }
     ]);
     if (result) {
@@ -144,18 +162,32 @@ export const ThreatDossier: React.FC = () => {
     setIsHardening(true);
     const steps = [
       "TERMINATING_TELNET_DAEMON... [OK]",
-      "INITIALIZING_OPENSSH_v9.3p1... [OK]",
-      "PATCHING_APACHE_HTTPD_CVE_2021... [PATCHED]",
-      "ENFORCING_TLS_v1.3_ON_FTP_PORT... [OK]",
+      "UPGRADING_APACHE_HTTPD_TO_v2.4.58+ (CVE-2021-41773/42013 RESOLVED)... [OK]",
+      "AUDITING_APACHE_MODULES: DISABLING mod_proxy_uwsgi... [DISABLED]",
+      "UPGRADING_SQUID_PROXY_TO_v5.9+ / 4.15+ SECURITY RELEASE... [OK]",
+      "AUDITING_SQUID_ACL_CONFIGURATION (BYPASSES CLOSED)... [SECURED]",
+      "DEPLOYING_WAF_HEADER_INJECTION_AND_SMUGGLING_SHIELD... [ACTIVE]",
+      "INITIALIZING_OPENSSH_v9.3p1_ED25519... [OK]",
+      "ENFORCING_TLS_v1.3_ON_ALL_GATEWAYS... [ENFORCED]",
       "SEALING_NODE_CERTIFICATES... [VERIFIED]"
     ];
 
     for (const step of steps) {
-       await new Promise(r => setTimeout(r, 900));
+       await new Promise(r => setTimeout(r, 650));
        setHardenedSteps(prev => [...prev, step]);
     }
     
-    setRecords(prev => prev.map(r => r.id === selectedRecord.id ? { ...r, status: 'NEUTRALIZED', mitigations: [...r.mitigations, "SSH Migration", "Apache Patching", "TLS Enforcement"] } : r));
+    setRecords(prev => prev.map(r => r.id === selectedRecord.id ? { 
+      ...r, 
+      status: 'NEUTRALIZED', 
+      mitigations: [
+        ...r.mitigations, 
+        "Apache HTTPD >= 2.4.58 Updated", 
+        "Squid 5.x Audited", 
+        "mod_proxy_uwsgi Disabled", 
+        "WAF Header Injection & Smuggling Guard Active"
+      ] 
+    } : r));
     setIsHardening(false);
   };
 
@@ -402,15 +434,13 @@ export const ThreatDossier: React.FC = () => {
                                  <span>{isAnalyzing ? 'Analyzing_Engine...' : 'AI Deep Scan'}</span>
                               </button>
                             )}
-                            {selectedRecord.status === 'NEUTRALIZED' && (
-                              <button 
-                                onClick={applyHardening}
-                                className="px-8 py-4 bg-cyan-600/10 border-2 border-cyan-500/20 hover:bg-cyan-500 hover:text-slate-950 text-cyan-400 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 flex items-center space-x-3"
-                              >
-                                 <Lock className="w-4 h-4" />
-                                 <span>Strategic Hardening</span>
-                              </button>
-                            )}
+                            <button 
+                              onClick={applyHardening}
+                              className="px-8 py-4 bg-cyan-600/10 border-2 border-cyan-500/20 hover:bg-cyan-500 hover:text-slate-950 text-cyan-400 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 flex items-center space-x-3"
+                            >
+                               <Lock className="w-4 h-4" />
+                               <span>Strategic Hardening</span>
+                            </button>
                             {selectedRecord.status !== 'NEUTRALIZED' ? (
                               <button 
                                 onClick={initiateTakedown}

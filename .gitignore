@@ -1,4 +1,30 @@
-# Logs
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Production and build outputs
+dist
+dist-ssr
+build
+out
+
+# Tauri build artifacts
+src-tauri/target
+src-tauri/WixTools
+src-tauri/gen
+
+# Environment files and credentials (never commit secrets)
+.env
+.env*.local
+!.env.example
+*.pem
+*.key
+*.cert
+*.pfx
+*.p12
+
+# Logs and runtime data
 logs
 *.log
 npm-debug.log*
@@ -7,18 +33,34 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Test coverage
+coverage
+*.lcov
+
+# Temporary files and caches
+.cache
+.vite
+.parcel-cache
+.eslintcache
+.temp
+.tmp
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Operating system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

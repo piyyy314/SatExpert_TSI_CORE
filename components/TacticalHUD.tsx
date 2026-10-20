@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { Coordinates, Satellite, SatelliteStatus, WeatherCondition, TacticalEvent, BugReportEvent } from '../src/types.ts';
 import { fetchSatelliteStatusUpdates } from '../services/satelliteService.ts';
 import { audioController } from '../services/audioService.ts';
-import { generateBugReportPDF } from '../services/pdfService.ts';
+import { generateBugReportPDF, generateTacticalAARPDF } from '../services/pdfService.ts';
 
 interface Props {
   loc: Coordinates;
@@ -212,6 +212,131 @@ export const TacticalHUD: React.FC<Props> = ({
     setTimeout(() => setIsExporting(false), 2000);
   };
 
+  const exportFullLogJSON = () => {
+    const aarData = {
+      report_id: `AAR-STIA-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      timestamp: new Date().toISOString(),
+      classification: "CONFIDENTIAL // TACTICAL OPERATIONS",
+      operator: "baalbek.313@gmail.com",
+      environment_context: {
+        defcon_level: satellites.some(s => s.status === 'offline') ? 2 : 4,
+        weather_condition: weather,
+        rain_fade_estimate: weather === 'CLEAR' ? '0.5dB' : weather === 'OVERCAST' ? '2.0dB' : '8.0dB+',
+        stealth_mode: isStealthMode ? "ENABLED" : "DISABLED",
+        electronic_warfare: {
+          jamming_active: isJamming,
+          jamming_intensity: `${jammingPower}%`,
+        },
+        current_tracked_asset: {
+          id: sat.id,
+          name: sat.name,
+          orbital_slot: sat.orbitalSlot,
+          operator: sat.operator
+        },
+        telemetry: {
+          snr_margin: `${telemetry.snr} dB`,
+          rx_power: `${telemetry.rxPower} dBm`,
+          buc_temp: `${telemetry.bucTemp} °C`,
+          packet_loss_rate: `${telemetry.packetLoss}%`,
+          link_state: telemetry.status
+        }
+      },
+      event_logs: eventLogs
+    };
+
+    const blob = new Blob([JSON.stringify(aarData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `TSI_AAR_${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportFullLogTXT = () => {
+    const aarId = `AAR-STIA-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const timestampStr = new Date().toISOString();
+    
+    let report = "";
+    report += "================================================================================\n";
+    report += "                    TACTICAL AFTER-ACTION REPORT (AAR)                          \n";
+    report += `                    REPORT ID: ${aarId}                             \n`;
+    report += "================================================================================\n\n";
+    
+    report += "OPERATIONAL PARAMS & METRIC AUDIT\n";
+    report += "--------------------------------------------------------------------------------\n";
+    report += `TIMESTAMP           : ${timestampStr}\n`;
+    report += `OPERATOR            : baalbek.313@gmail.com\n`;
+    report += `CLASSIFICATION      : CONFIDENTIAL // TACTICAL SITUATION INTEL\n`;
+    report += `STEALTH MODE STATUS : ${isStealthMode ? 'ENABLED (MAX SCAN REDUCTION)' : 'DISABLED (ACTIVE THERMAL/RF SIGNATURE)'}\n`;
+    report += `WEATHER INDEX       : ${weather} (Rain Fade Est: ${weather === 'CLEAR' ? '0.5dB' : weather === 'OVERCAST' ? '2.0dB' : '8.0dB+'})\n`;
+    report += `ELECTRONIC WARFARE  : ${isJamming ? `ACTIVE (JAMMING POWER: ${jammingPower}%)` : 'INACTIVE'}\n`;
+    report += `DECOY PROTOCOLS     : ${isDecoyActive ? 'DEPLOYED / CHARGED' : 'STANDBY'}\n`;
+    report += `ZERO-POINT ENERGY   : ${isZPEActive ? 'ACTIVE (COOLING COMPENSATED)' : 'OFF'}\n\n`;
+    
+    report += "TARGET ASSET DESCRIPTION\n";
+    report += "--------------------------------------------------------------------------------\n";
+    report += `ASSET ID            : ${sat.id}\n`;
+    report += `ASSET DESIGNATION   : ${sat.name}\n`;
+    report += `ORBITAL SLOT        : ${sat.orbitalSlot}\n`;
+    report += `OPERATIONAL CONTROL : ${sat.operator || 'UNSPECIFIED'}\n\n`;
+    
+    report += "LIVE TELEMETRY MARGINS\n";
+    report += "--------------------------------------------------------------------------------\n";
+    report += `SNR MARGIN          : ${telemetry.snr} dB\n`;
+    report += `RX SIGNAL POWER     : ${telemetry.rxPower} dBm\n`;
+    report += `BUC TEMPERATURE     : ${telemetry.bucTemp} °C\n`;
+    report += `PACKET LOSS RATE    : ${telemetry.packetLoss}%\n`;
+    report += `LINK STATE          : ${telemetry.status}\n\n`;
+    
+    report += "CHRONOLOGICAL EVENT LOG / SITUATION FEED\n";
+    report += "--------------------------------------------------------------------------------\n";
+    if (eventLogs.length > 0) {
+      eventLogs.forEach((log, index) => {
+        const indexStr = String(index + 1).padStart(2, '0');
+        report += `[${indexStr}] [${log.timestamp}] [${log.status.toUpperCase().padEnd(8)}] [${log.satName}] ${log.detail}\n`;
+      });
+    } else {
+      report += "No situational log streams captured during active tracking.\n";
+    }
+    report += "\n--------------------------------------------------------------------------------\n";
+    report += "================================================================================\n";
+    report += "                    END OF TACTICAL REPORT // TSI TERMINAL                      \n";
+    report += "================================================================================\n";
+
+    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `TSI_AAR_${Date.now()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportFullLogPDF = () => {
+    try {
+      generateTacticalAARPDF(
+        eventLogs,
+        sat,
+        satellites,
+        weather,
+        isStealthMode,
+        isJamming,
+        jammingPower,
+        isDecoyActive,
+        isZPEActive,
+        false,
+        telemetry
+      );
+    } catch (err) {
+      console.error("Failed to generate PDF Report:", err);
+    }
+  };
+
   const handleBugReport = () => {
     setIsExporting(true);
     
@@ -342,6 +467,39 @@ export const TacticalHUD: React.FC<Props> = ({
             <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] mb-2 italic">Position_Node</span>
             <span className="text-[12px] font-black text-red-500 font-mono tracking-tighter italic shadow-red-500/10 text-glow">{sat.orbitalSlot}</span>
           </div>
+        </div>
+
+        {/* GPS Tracking & Ground Station Location Coordinates */}
+        <div className="bg-black/40 rounded-[2.2rem] border-2 border-slate-900 p-6 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-inner group hover:border-cyan-500/20 transition-all">
+          <div className="flex flex-col space-y-1 text-left w-full sm:w-auto">
+            <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] italic">Ground_Station_COORDS</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-[13px] font-mono font-black text-slate-200 tracking-tight">
+                {loc.lat.toFixed(4)}°N, {loc.lng.toFixed(4)}°E
+              </span>
+              <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase border font-mono ${
+                isTracking 
+                  ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30 animate-pulse' 
+                  : 'bg-slate-950 text-slate-500 border-slate-800'
+              }`}>
+                {isTracking ? 'GPS_LOCK' : 'STATIC'}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => onTrackingChange && onTrackingChange(!isTracking)}
+            className={`w-full sm:w-auto px-6 py-3.5 rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] transition-all duration-500 active:scale-95 italic border-2 flex items-center justify-center space-x-2 ${
+              isTracking
+                ? 'bg-cyan-500 border-cyan-400 text-slate-950 hover:bg-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.25)]'
+                : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30'
+            }`}
+          >
+            <svg className={`w-4 h-4 ${isTracking ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>{isTracking ? 'DISENGAGE_AUTO_TRACK' : 'ENABLE_GPS_TRACKING'}</span>
+          </button>
         </div>
 
         <div className="bg-black/40 rounded-[2.5rem] border-2 border-slate-900 p-6 space-y-6 shadow-inner">
@@ -496,6 +654,43 @@ export const TacticalHUD: React.FC<Props> = ({
                  <span className="text-[10px] font-black tracking-widest">DISMISS</span>
                  <svg className="w-6 h-6 group-hover:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                </button>
+            </div>
+
+            {/* Tactical After-Action Report (AAR) Export Hub */}
+            <div className="bg-slate-950/80 px-10 py-5 border-b border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center space-x-3">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">AAR_EXPORT_HUB //</span>
+                <span className="text-[11px] font-mono text-cyan-400 font-bold">{eventLogs.length} Records Loaded</span>
+              </div>
+              <div className="flex flex-wrap gap-2 sm:gap-3">
+                <button
+                  onClick={exportFullLogJSON}
+                  className="px-5 py-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500 hover:bg-cyan-500/10 text-[10px] font-black text-slate-300 hover:text-cyan-400 transition-all uppercase tracking-widest flex items-center space-x-2 active:scale-95"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M4 12V4a2 2 0 012-2h4a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V12" />
+                  </svg>
+                  <span>Export JSON</span>
+                </button>
+                <button
+                  onClick={exportFullLogTXT}
+                  className="px-5 py-3 rounded-xl bg-red-600/10 border border-red-500/40 hover:bg-red-600 hover:text-white hover:border-red-400 text-[10px] font-black text-red-400 transition-all uppercase tracking-widest flex items-center space-x-2 active:scale-95"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>Export TXT AAR</span>
+                </button>
+                <button
+                  onClick={exportFullLogPDF}
+                  className="px-5 py-3 rounded-xl bg-cyan-600/15 border border-cyan-500/40 hover:bg-cyan-600 hover:text-white hover:border-cyan-300 text-[10px] font-black text-cyan-400 transition-all uppercase tracking-widest flex items-center space-x-2 active:scale-95"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>Generate PDF Report</span>
+                </button>
+              </div>
             </div>
             
             <div className="flex-grow overflow-y-auto p-10 space-y-6 bg-[#050810] scrollbar-hide">

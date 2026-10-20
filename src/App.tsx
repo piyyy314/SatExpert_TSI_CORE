@@ -52,27 +52,6 @@ import { QuantumDecryptor } from '../components/QuantumDecryptor.tsx';
 import { BiometricScanner } from '../components/BiometricScanner.tsx';
 import { TacticalScriptEnv } from '../components/TacticalScriptEnv.tsx';
 import { RemoteAccessTerminal } from '../components/RemoteAccessTerminal.tsx';
-import { AIAssistantWidget } from '../components/AIAssistantWidget.tsx';
-import { APIClientSuite } from '../components/APIClientSuite.tsx';
-import { AptLateralTracker } from '../components/AptLateralTracker.tsx';
-import { BugBountyLab } from '../components/BugBountyLab.tsx';
-import { DDOSSimulator } from '../components/DDOSSimulator.tsx';
-import { DaemonManager } from '../components/DaemonManager.tsx';
-import { DarkLinkProtocol } from '../components/DarkLinkProtocol.tsx';
-import { DeepfakeComms } from '../components/DeepfakeComms.tsx';
-import { ExecutableBuilder } from '../components/ExecutableBuilder.tsx';
-import { NmapScanner } from '../components/NmapScanner.tsx';
-import { PQCMigrationTimeline } from '../components/PQCMigrationTimeline.tsx';
-import { PalantirAuditSuite } from '../components/PalantirAuditSuite.tsx';
-import { PhishingCampaignManager } from '../components/PhishingCampaignManager.tsx';
-import { PurpleTeamArsenal } from '../components/PurpleTeamArsenal.tsx';
-import { QuantumIntelligenceHub } from '../components/QuantumIntelligenceHub.tsx';
-import { QuantumTimeline } from '../components/QuantumTimeline.tsx';
-import { RansomwareSim } from '../components/RansomwareSim.tsx';
-import { SCADAExploit } from '../components/SCADAExploit.tsx';
-import { SentinelAIControl } from '../components/SentinelAIControl.tsx';
-import { WifiCountermeasures } from '../components/WifiCountermeasures.tsx';
-import { ZeroDayForge } from '../components/ZeroDayForge.tsx';
 import { audioController } from '../services/audioService.ts';
 import { Coordinates, Satellite, LookAngles, WeatherCondition, MainView, SatelliteStatus, TacticalEvent } from './types.ts';
 import { COMMON_SATELLITES } from './constants.ts';
@@ -227,13 +206,55 @@ export const App: React.FC = () => {
     setLookAngles(calculateLookAngles(userLoc, selectedSat.longitude));
   }, [userLoc, selectedSat]);
 
+  // Automated satellite tracking via browser Geolocation API
+  useEffect(() => {
+    if (!isTracking) return;
+
+    addMissionLog(`GPS_TRACKING_ON: Establishing dynamic coordinate tracking via Geolocation API`, 'info');
+
+    const onSuccess = (position: GeolocationPosition) => {
+      const { latitude, longitude } = position.coords;
+      setUserLoc({ lat: latitude, lng: longitude });
+      addMissionLog(`GPS_SYNC: Target coordinates locked [${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°W]`, 'active');
+    };
+
+    const onError = (error: GeolocationPositionError) => {
+      console.warn("Browser Geolocation error:", error);
+      addMissionLog(`GPS_LINK_ALERT: ${error.message.toUpperCase() || 'PERMISSION_DENIED'} - Engaging safe orbital coordinate fluctuation`, 'offline');
+      
+      // Safe orbital ground drift simulator for demo feedback
+      setUserLoc(prev => ({
+        lat: Number((prev.lat + (Math.random() - 0.5) * 0.002).toFixed(4)),
+        lng: Number((prev.lng + (Math.random() - 0.5) * 0.002).toFixed(4))
+      }));
+    };
+
+    if ('geolocation' in navigator) {
+      const triggerGpsUpdate = () => {
+        navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+          enableHighAccuracy: true,
+          timeout: 4000,
+          maximumAge: 0
+        });
+      };
+
+      triggerGpsUpdate();
+      const intervalToken = setInterval(triggerGpsUpdate, 5000); // Refresh every 5 seconds
+
+      return () => {
+        clearInterval(intervalToken);
+        addMissionLog(`GPS_TRACKING_DISCONNECT: Automatic look-angle updates disengaged`, 'info');
+      };
+    } else {
+      addMissionLog('GPS_LOCK_ERROR: Local terminal hardware does not support standard geolocation api', 'CRITICAL');
+    }
+  }, [isTracking, addMissionLog]);
+
   const VIEW_CATEGORIES = [
     { name: 'TACTICAL_BASE', views: ['tactical', 'constellation', 'satellite_detail', 'mesh', 'weather', 'geolocator'] },
     { name: 'SIGINT_SUITE', views: ['intelligence', 'interception', 'node_scanner', 'spoof_tracer', 'threat_dossier', 'yara_scanner', 'sniffer', 'analyzer', 'specter', 'traps', 'radio_intercept', 'quantum_decryptor', 'biometric_scanner'] },
     { name: 'ACTIVE_OPS', views: ['tactical_suite', 'warfare', 'planner', 'neural', 'orbital_strike', 'drone_swarm', 'kill_chain', 'cyber_attack', 'signal_jamming', 'botnet_command', 'script_env', 'remote_access'] },
     { name: 'CYBER_CMD', views: ['defense', 'simulation', 'aegis', 'usb_manager', 'vsat_config', 'grover'] },
-    { name: 'ACTIVE_OPS_II', views: ['ai_assistant', 'api_client', 'apt_lateral', 'bug_bounty', 'ddos_sim', 'daemon_manager', 'dark_link', 'deepfake', 'exe_builder', 'nmap_scanner'] },
-    { name: 'ACTIVE_OPS_III', views: ['pqc_timeline', 'palantir_audit', 'phishing_campaign', 'purple_team', 'quantum_intel', 'quantum_timeline', 'ransomware_sim', 'scada_exploit', 'sentinel_ai', 'wifi_counter', 'zero_day'] },
     { name: 'AUX_DATA', views: ['media', 'live', 'calculations', 'terrain', 'news'] }
   ];
 
@@ -268,7 +289,7 @@ export const App: React.FC = () => {
                    </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
                   {VIEW_CATEGORIES.map(cat => (
                     <div key={cat.name} className="space-y-4">
                        <div className="flex items-center justify-between mx-1">
@@ -554,28 +575,6 @@ export const App: React.FC = () => {
             {view === 'remote_access' && (
               <RemoteAccessTerminal addMissionLog={addMissionLog} />
             )}
-
-            {view === 'ai_assistant' && <AIAssistantWidget />}
-            {view === 'api_client' && <APIClientSuite />}
-            {view === 'apt_lateral' && <AptLateralTracker />}
-            {view === 'bug_bounty' && <BugBountyLab />}
-            {view === 'ddos_sim' && <DDOSSimulator />}
-            {view === 'daemon_manager' && <DaemonManager />}
-            {view === 'dark_link' && <DarkLinkProtocol />}
-            {view === 'deepfake' && <DeepfakeComms />}
-            {view === 'exe_builder' && <ExecutableBuilder />}
-            {view === 'nmap_scanner' && <NmapScanner />}
-            {view === 'pqc_timeline' && <PQCMigrationTimeline />}
-            {view === 'palantir_audit' && <PalantirAuditSuite />}
-            {view === 'phishing_campaign' && <PhishingCampaignManager />}
-            {view === 'purple_team' && <PurpleTeamArsenal />}
-            {view === 'quantum_intel' && <QuantumIntelligenceHub />}
-            {view === 'quantum_timeline' && <QuantumTimeline />}
-            {view === 'ransomware_sim' && <RansomwareSim />}
-            {view === 'scada_exploit' && <SCADAExploit />}
-            {view === 'sentinel_ai' && <SentinelAIControl />}
-            {view === 'wifi_counter' && <WifiCountermeasures />}
-            {view === 'zero_day' && <ZeroDayForge />}
 
             {view === 'defense' && (
               <div className="max-w-6xl mx-auto">
