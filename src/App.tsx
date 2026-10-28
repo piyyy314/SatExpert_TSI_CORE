@@ -53,7 +53,7 @@ import { BiometricScanner } from '../components/BiometricScanner.tsx';
 import { TacticalScriptEnv } from '../components/TacticalScriptEnv.tsx';
 import { RemoteAccessTerminal } from '../components/RemoteAccessTerminal.tsx';
 import { SystemDiagnostics } from '../components/SystemDiagnostics.tsx';
-import { audioController } from '../services/audioService.ts';
+import { audioController, tacticalAlertService } from '../services/audioService.ts';
 import { Coordinates, Satellite, LookAngles, WeatherCondition, MainView, SatelliteStatus, TacticalEvent } from './types.ts';
 import { COMMON_SATELLITES } from './constants.ts';
 import { calculateLookAngles } from '../utils/geoUtils.ts';
@@ -202,6 +202,17 @@ export const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(EVENT_LOG_STORAGE_KEY, JSON.stringify(eventLogs));
   }, [eventLogs]);
+
+  // Tactical Alert Acoustic Service: Triggers cues on CRITICAL telemetry & Jamming state
+  useEffect(() => {
+    if (isFirstMount.current) return;
+    tacticalAlertService.updateTelemetryStatus(telemetry.status);
+  }, [telemetry.status]);
+
+  useEffect(() => {
+    if (isFirstMount.current) return;
+    tacticalAlertService.setJammingState(isJamming);
+  }, [isJamming]);
 
   useEffect(() => {
     setLookAngles(calculateLookAngles(userLoc, selectedSat.longitude));

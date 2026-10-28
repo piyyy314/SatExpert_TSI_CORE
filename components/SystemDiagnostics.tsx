@@ -25,7 +25,7 @@ import {
   Gauge
 } from 'lucide-react';
 import { Coordinates, Satellite as SatelliteType } from '../src/types.ts';
-import { audioController } from '../services/audioService.ts';
+import { audioController, tacticalAlertService } from '../services/audioService.ts';
 import { generatePQCKeyPair } from '../services/pqcService.ts';
 
 export interface ServiceDiagnostic {
@@ -697,6 +697,42 @@ export const SystemDiagnostics: React.FC<Props> = ({
             <div className="text-[10px] text-slate-500 flex justify-between">
               <span>DEFCON LEVEL: <span className="text-red-400 font-bold">{defcon}</span></span>
               <span>STEALTH: <span className="text-purple-400 font-bold">{isStealthMode ? 'ACTIVE' : 'OFF'}</span></span>
+            </div>
+          </div>
+
+          {/* Tactical Alert Service Acoustic Verification */}
+          <div className="glass p-5 rounded-2xl border border-red-500/30 bg-red-950/10 space-y-3 font-mono text-xs">
+            <div className="flex items-center justify-between text-red-400">
+              <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5 text-red-400" />
+                TACTICAL_ALERT_SERVICE
+              </span>
+              <span className="px-2 py-0.5 rounded text-[8px] bg-red-500/20 text-red-400 border border-red-500/40 font-bold">
+                ONLINE
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-400 leading-tight">
+              Real-time Web Audio acoustic cues for telemetry CRITICAL status and RF electronic warfare jamming pulses.
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => {
+                  tacticalAlertService.playCriticalWarble();
+                  if (addMissionLog) addMissionLog('ACOUSTIC_TEST: Telemetry CRITICAL dual-tone klaxon tested', 'active');
+                }}
+                className="py-2 px-2.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+              >
+                Test Critical Warble
+              </button>
+              <button
+                onClick={() => {
+                  tacticalAlertService.playJammingSweep();
+                  if (addMissionLog) addMissionLog('ACOUSTIC_TEST: Electronic jamming RF sweep tested', 'active');
+                }}
+                className="py-2 px-2.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+              >
+                Test Jamming Sweep
+              </button>
             </div>
           </div>
 

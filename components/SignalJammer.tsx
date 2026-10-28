@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Radio, Zap, Volume2, ShieldX, WifiOff, AlertTriangle, Activity } from 'lucide-react';
+import { tacticalAlertService } from '../services/audioService.ts';
 
 export const SignalJammer: React.FC<{ addMissionLog?: (detail: string, status?: any) => void }> = ({ addMissionLog }) => {
   const [frequency, setFrequency] = useState(2.4);
@@ -18,9 +19,11 @@ export const SignalJammer: React.FC<{ addMissionLog?: (detail: string, status?: 
   const toggleJamming = () => {
     if (!isJamming) {
       setIsJamming(true);
+      tacticalAlertService.triggerJammingCue(true);
       if (addMissionLog) addMissionLog(`JAM_INIT: Pulse authorized on ${frequency}GHz (${selectedBand}). News feeds disrupted.`, 'active');
     } else {
       setIsJamming(false);
+      tacticalAlertService.triggerJammingCue(false);
       if (addMissionLog) addMissionLog(`JAM_CEASED: Clearing RF noise floor.`, 'info');
     }
   };

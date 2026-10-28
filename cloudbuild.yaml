@@ -1,0 +1,42 @@
+# -----------------------------------------------------------------------------
+# Google Cloud Build Pipeline for SatExpert TSI
+# Builds Docker container and deploys directly to Google Cloud Run
+# -----------------------------------------------------------------------------
+steps:
+  # 1. Build Docker container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/satexpert-tsi:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/satexpert-tsi:latest'
+      - '.'
+
+  # 2. Push image to Container / Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/satexpert-tsi:latest'
+
+  # 3. Deploy container image to Google Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'satexpert-tsi'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/satexpert-tsi:latest'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+images:
+  - 'gcr.io/$PROJECT_ID/satexpert-tsi:latest'
+  - 'gcr.io/$PROJECT_ID/satexpert-tsi:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
