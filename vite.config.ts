@@ -21,6 +21,38 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@': path.resolve(__dirname, './src'),
+        },
+        dedupe: [
+          'react',
+          'react-dom',
+          'jspdf',
+          'jspdf-autotable',
+          'lucide-react',
+          'motion',
+          'recharts'
+        ]
+      },
+      optimizeDeps: {
+        include: [
+          'react',
+          'react-dom',
+          'jspdf',
+          'jspdf-autotable',
+          'lucide-react',
+          'motion',
+          'recharts',
+          '@google/genai',
+          '@noble/post-quantum',
+          'dilithium-js',
+          'uuid',
+          'inflection'
+        ],
+        holdUntilCrawlEnd: true
+      },
+      build: {
+        commonjsOptions: {
+          include: [/node_modules/],
+          transformMixedEsModules: true
         }
       }
     };

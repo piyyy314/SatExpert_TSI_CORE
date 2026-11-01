@@ -9,8 +9,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-COPY package*.json ./
-RUN npm ci
+COPY package*.json .npmrc ./
+RUN npm ci --strict-peer-deps
 
 # Copy source files
 COPY . .
