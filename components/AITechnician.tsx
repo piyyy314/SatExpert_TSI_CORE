@@ -223,9 +223,6 @@ export const AITechnician: React.FC<Props> = ({ context, telemetry, isStealthMod
       mediaData: currentFiles.map(f => ({ data: f.data, mimeType: f.mimeType }))
     });
 
-    if (result.error === "KEY_AUTH_FAILURE") {
-       (window as any).aistudio?.openSelectKey();
-    }
 
     const assistantMessage = { 
       role: 'assistant' as const, 

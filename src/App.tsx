@@ -1,6 +1,5 @@
 
-import * as React from 'react';
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Layout } from '../components/Layout.tsx';
 import { LookAngleCard } from '../components/LookAngleCard.tsx';
 import { AITechnician } from '../components/AITechnician.tsx';
@@ -53,6 +52,7 @@ import { BiometricScanner } from '../components/BiometricScanner.tsx';
 import { TacticalScriptEnv } from '../components/TacticalScriptEnv.tsx';
 import { RemoteAccessTerminal } from '../components/RemoteAccessTerminal.tsx';
 import { SystemDiagnostics } from '../components/SystemDiagnostics.tsx';
+import { PDFExportButton } from '../components/PDFExportButton.tsx';
 import { audioController, tacticalAlertService } from '../services/audioService.ts';
 import { Coordinates, Satellite, LookAngles, WeatherCondition, MainView, SatelliteStatus, TacticalEvent } from './types.ts';
 import { COMMON_SATELLITES } from './constants.ts';
@@ -359,6 +359,50 @@ export const App: React.FC = () => {
             </div>
           </div>
 
+          {/* Module Action & PDF Export Header Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between glass p-4 rounded-3xl border-2 border-slate-800/80 gap-4 shadow-xl">
+             <div className="flex items-center space-x-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
+                <div className="flex flex-col">
+                   <span className="text-[11px] font-black uppercase text-white tracking-[0.25em]">
+                      ACTIVE MODULE: <span className="text-cyan-400">{view.toUpperCase().replace(/_/g, ' ')}</span>
+                   </span>
+                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">
+                      REALTIME INTELLIGENCE & TELEMETRY PROTOCOL
+                   </span>
+                </div>
+             </div>
+
+             <div className="flex items-center space-x-3">
+                <span className="text-[9px] font-mono text-slate-400 uppercase px-3 py-1 bg-slate-900 border border-slate-800 rounded-xl hidden md:inline-block">
+                   TELEMETRY: <span className={telemetry.status === 'CRITICAL' ? 'text-red-400 font-bold' : 'text-emerald-400 font-bold'}>{telemetry.status}</span>
+                </span>
+                <PDFExportButton
+                  moduleName={view.toUpperCase().replace(/_/g, ' ')}
+                  subtitle={`Operational Technical Intel & Telemetry Audit Report - ${view.toUpperCase()}`}
+                  userLoc={userLoc}
+                  satelliteName={selectedSat.name}
+                  satLongitude={selectedSat.longitude}
+                  defcon={defcon}
+                  isJamming={isJamming}
+                  jammingPower={jammingPower}
+                  telemetry={telemetry}
+                  details={[
+                    { key: 'Module Identifier', value: view.toUpperCase().replace(/_/g, ' ') },
+                    { key: 'Target Asset', value: `${selectedSat.name} (${selectedSat.longitude}°E)` },
+                    { key: 'Operator Position', value: `${userLoc.lat.toFixed(4)}°N, ${userLoc.lng.toFixed(4)}°W` },
+                    { key: 'Threat Readiness', value: `DEFCON ${defcon}` },
+                    { key: 'EW Jamming Countermeasures', value: isJamming ? `ACTIVE at ${jammingPower}% output power` : 'INACTIVE' },
+                    { key: 'Carrier SNR', value: `${telemetry.snr} dB` },
+                    { key: 'Receiver Power / BUC Temp', value: `${telemetry.rxPower} dBm / ${telemetry.bucTemp}°C` },
+                    { key: 'Packet Error Rate', value: `${telemetry.packetLoss}%` }
+                  ]}
+                  summaryText={`Official tactical intelligence report generated for module ${view.toUpperCase()}. Telemetry link status is ${telemetry.status} with current carrier SNR of ${telemetry.snr} dB.`}
+                  size="md"
+                />
+             </div>
+          </div>
+
           <div className="min-h-[70vh]">
             {view === 'tactical' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in slide-in-from-bottom-4">
@@ -391,7 +435,16 @@ export const App: React.FC = () => {
                     hasNewLogs={hasNewLogs}
                     setHasNewLogs={setHasNewLogs}
                   />
-                  <TacticalMap userLoc={userLoc} satellite={selectedSat} isTracking={isTracking} isStealthMode={isStealthMode} onLocChange={setUserLoc} />
+                  <TacticalMap 
+                    userLoc={userLoc} 
+                    satellite={selectedSat} 
+                    isTracking={isTracking} 
+                    isStealthMode={isStealthMode} 
+                    isJamming={isJamming}
+                    jammingPower={jammingPower}
+                    telemetry={telemetry}
+                    onLocChange={setUserLoc} 
+                  />
                   <div className="grid grid-cols-1 gap-6">
                     <WeatherDashboard weather={weather} loc={userLoc} satName={selectedSat.name} />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-6">

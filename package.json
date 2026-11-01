@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tsx server.ts",
+    "start": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
@@ -13,7 +14,10 @@
   "dependencies": {
     "@google/genai": "latest",
     "@noble/post-quantum": "^0.6.1",
+    "@types/d3": "^7.4.3",
+    "d3": "^7.9.0",
     "dilithium-js": "^1.8.7",
+    "express": "^5.3.0",
     "inflection": "^3.0.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.9",
@@ -22,16 +26,20 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "recharts": "^3.8.1",
-    "uuid": "^14.0.3"
+    "uuid": "^14.0.3",
+    "ws": "^8.22.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/cli": "^2.11.2",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.14.0",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^5.0.0",
     "tailwindcss": "^4.3.0",
+    "tsx": "^4.23.15",
     "typescript": "~5.8.2",
     "vite": "^6.4.4"
   }

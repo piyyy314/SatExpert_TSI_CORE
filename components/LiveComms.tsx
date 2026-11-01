@@ -1,16 +1,14 @@
-
 import * as React from 'react';
-import { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { useState, useRef } from 'react';
 
-export const LiveComms: React.FC<{ isStealthMode: boolean; addMissionLog?: (detail: string, status?: any) => void }> = ({ isStealthMode, addMissionLog }) => {
+export const LiveComms: React.FC<{ isStealthMode: boolean; addMissionLog?: (detail: string, status?: any) => void }> = ({ addMissionLog }) => {
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transcriptions, setTranscriptions] = useState<{role: string, text: string}[]>([]);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef(0);
-  const sessionRef = useRef<any>(null);
+  const sessionRef = useRef<WebSocket | null>(null);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
 
   const decodeAudioData = async (data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number) => {
@@ -39,70 +37,73 @@ export const LiveComms: React.FC<{ isStealthMode: boolean; addMissionLog?: (deta
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("MICROPHONE_HARDWARE_NOT_FOUND");
       }
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       audioContextRef.current = new AudioContext({ sampleRate: 24000 });
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      const sessionPromise = ai.live.connect({
-        model: 'gemini-3.1-flash-live-preview',
-        callbacks: {
-          onopen: () => {
-            setIsActive(true);
-            const inputCtx = new AudioContext({ sampleRate: 16000 });
-            const source = inputCtx.createMediaStreamSource(stream);
-            const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
-            
-            scriptProcessor.onaudioprocess = (e) => {
-              const input = e.inputBuffer.getChannelData(0);
-              const int16 = new Int16Array(input.length);
-              for (let i = 0; i < input.length; i++) int16[i] = input[i] * 32768;
-              const base64 = btoa(String.fromCharCode(...new Uint8Array(int16.buffer)));
-              sessionPromise.then(s => s.sendRealtimeInput({ audio: { data: base64, mimeType: 'audio/pcm;rate=16000' } }));
-            };
-            source.connect(scriptProcessor);
-            scriptProcessor.connect(inputCtx.destination);
-          },
-          onmessage: async (msg: LiveServerMessage) => {
-            if (msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data) {
-              const base64 = msg.serverContent.modelTurn.parts[0].inlineData.data;
-              const bytes = decodeBase64(base64);
-              const buffer = await decodeAudioData(bytes, audioContextRef.current!, 24000, 1);
-              const source = audioContextRef.current!.createBufferSource();
-              source.buffer = buffer;
-              source.connect(audioContextRef.current!.destination);
-              nextStartTimeRef.current = Math.max(nextStartTimeRef.current, audioContextRef.current!.currentTime);
-              source.start(nextStartTimeRef.current);
-              nextStartTimeRef.current += buffer.duration;
-              sourcesRef.current.add(source);
-            }
-            if (msg.serverContent?.outputTranscription) {
-               setTranscriptions(prev => [...prev, {role: 'STIA', text: msg.serverContent!.outputTranscription!.text}]);
-            }
-            if (msg.serverContent?.inputTranscription) {
-               setTranscriptions(prev => [...prev, {role: 'USER', text: msg.serverContent!.inputTranscription!.text}]);
-            }
-          },
-          onclose: () => {
-             setIsActive(false);
-             if (addMissionLog) addMissionLog("[COMMS_CLOSED] Satellite out of range.", 'info');
-          },
-          onerror: (e: any) => {
-             console.error("LIVE_ERROR", e);
-             setError(`COMMS_INTERFERENCE: ${e.message || 'Unknown protocol error'}`);
-             if (e.message?.includes("PERMISSION_DENIED")) {
-                (window as any).aistudio?.openSelectKey();
-             }
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${protocol}//${window.location.host}/live`);
+      sessionRef.current = ws;
+
+      ws.onopen = () => {
+        setIsActive(true);
+        const inputCtx = new AudioContext({ sampleRate: 16000 });
+        const source = inputCtx.createMediaStreamSource(stream);
+        const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
+        
+        scriptProcessor.onaudioprocess = (e) => {
+          const input = e.inputBuffer.getChannelData(0);
+          const int16 = new Int16Array(input.length);
+          for (let i = 0; i < input.length; i++) int16[i] = input[i] * 32768;
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(int16.buffer)));
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ audio: base64 }));
           }
-        },
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
-          systemInstruction: "You are the STIA AI agent. Respond via voice with technical precision.",
-          outputAudioTranscription: {},
-          inputAudioTranscription: {}
+        };
+        source.connect(scriptProcessor);
+        scriptProcessor.connect(inputCtx.destination);
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.audio) {
+            const bytes = decodeBase64(msg.audio);
+            const buffer = await decodeAudioData(bytes, audioContextRef.current!, 24000, 1);
+            const source = audioContextRef.current!.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContextRef.current!.destination);
+            nextStartTimeRef.current = Math.max(nextStartTimeRef.current, audioContextRef.current!.currentTime);
+            source.start(nextStartTimeRef.current);
+            nextStartTimeRef.current += buffer.duration;
+            sourcesRef.current.add(source);
+          }
+          if (msg.outputTranscription) {
+             setTranscriptions(prev => [...prev, {role: 'STIA', text: msg.outputTranscription}]);
+          }
+          if (msg.inputTranscription) {
+             setTranscriptions(prev => [...prev, {role: 'USER', text: msg.inputTranscription}]);
+          }
+          if (msg.closed) {
+             setIsActive(false);
+             if (addMissionLog) addMissionLog("[COMMS_CLOSED] Satellite link ended.", 'info');
+          }
+          if (msg.error) {
+             setError(`COMMS_INTERFERENCE: ${msg.error}`);
+          }
+        } catch (err) {
+          console.error("WS_MSG_ERROR", err);
         }
-      });
-      sessionRef.current = await sessionPromise;
+      };
+
+      ws.onclose = () => {
+        setIsActive(false);
+        if (addMissionLog) addMissionLog("[COMMS_CLOSED] Satellite out of range.", 'info');
+      };
+
+      ws.onerror = (e: any) => {
+        console.error("LIVE_ERROR", e);
+        setError("COMMS_INTERFERENCE: WebSocket protocol error");
+      };
     } catch (err: any) {
       console.error("LIVE_INIT_ERROR", err);
       if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
@@ -116,7 +117,10 @@ export const LiveComms: React.FC<{ isStealthMode: boolean; addMissionLog?: (deta
   };
 
   const stopSession = () => {
-    sessionRef.current?.close();
+    if (sessionRef.current) {
+      sessionRef.current.close();
+      sessionRef.current = null;
+    }
     setIsActive(false);
   };
 

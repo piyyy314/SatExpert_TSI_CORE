@@ -1,0 +1,35 @@
+name: CI/CD Build & Deployment
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-verify:
+    name: Build & Verify Production Applet
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Synchronize package-lock.json & Dependencies
+        run: npm install --strict-peer-deps
+
+      - name: Verify Clean Lockfile Installation
+        run: npm ci --strict-peer-deps
+
+      - name: Execute Typecheck & Linting
+        run: npm run lint
+
+      - name: Compile & Build Application
+        run: npm run build --strict-peer-deps

@@ -1,6 +1,7 @@
 
-import * as React from 'react';
+import React from 'react';
 import { Satellite, SatelliteStatus } from '../src/types.ts';
+import { PDFExportButton } from './PDFExportButton.tsx';
 
 interface Props {
   satellites: Satellite[];
@@ -36,6 +37,20 @@ export const ConstellationView: React.FC<Props> = ({ satellites, selectedSat, on
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">Global Asset Monitoring // {satellites.length} Active Nodes</p>
         </div>
         <div className="flex items-center space-x-4">
+           <PDFExportButton
+             moduleName="Satellite Constellation Registry"
+             subtitle={`Fleet Monitoring Log (${satellites.length} Active Nodes)`}
+             satelliteName={selectedSat.name}
+             satLongitude={selectedSat.longitude}
+             tables={[
+               {
+                 title: 'Satellite Fleet Status Registry',
+                 headers: ['ID', 'NAME', 'SLOT', 'OPERATOR', 'APOGEE (KM)', 'STATUS'],
+                 rows: satellites.map(s => [s.id, s.name, s.orbitalSlot, s.operator, s.apogee || 35786, s.status || 'ACTIVE'])
+               }
+             ]}
+             size="sm"
+           />
            <div className="flex flex-col items-end">
               <span className="text-[9px] text-slate-600 font-bold uppercase">Network_Health</span>
               <span className="text-xs font-black text-green-500 uppercase tracking-widest">Optimal</span>

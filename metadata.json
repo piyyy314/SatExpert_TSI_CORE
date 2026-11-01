@@ -7,6 +7,9 @@
     "camera",
     "usb"
   ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ],
   "y7": [],
   "Yp": []
 }

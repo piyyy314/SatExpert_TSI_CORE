@@ -1,28 +1,181 @@
-
-import * as React from 'react';
-import { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import * as d3 from 'd3';
 import { Coordinates, Satellite } from '../src/types.ts';
+import { PDFExportButton } from './PDFExportButton.tsx';
 
 interface Props {
   userLoc: Coordinates;
   satellite: Satellite;
   isTracking: boolean;
   isStealthMode: boolean;
+  isJamming?: boolean;
+  jammingPower?: number;
+  telemetry?: {
+    snr: string;
+    rxPower: string;
+    bucTemp: string;
+    packetLoss: string;
+    status: string;
+  };
   onLocChange?: (loc: Coordinates) => void;
   onTrackingChange?: (val: boolean) => void;
 }
 
-export const TacticalMap: React.FC<Props> = ({ userLoc, satellite, isTracking, isStealthMode, onLocChange, onTrackingChange }) => {
+export const TacticalMap: React.FC<Props> = ({
+  userLoc,
+  satellite,
+  isTracking,
+  isStealthMode,
+  isJamming = false,
+  jammingPower = 0,
+  telemetry,
+  onLocChange,
+  onTrackingChange
+}) => {
   const mapRef = useRef<HTMLDivElement>(null);
+  const d3SvgRef = useRef<SVGSVGElement>(null);
+  const [heatmapMode, setHeatmapMode] = useState<'INTERFERENCE' | 'SNR_FIELD' | 'ATMOSPHERIC'>('INTERFERENCE');
 
-  // Simple linear mapping for a tactical projection
+  // Projection coordinate mappers
   const getX = (lng: number) => ((lng + 180) / 360) * 100;
   const getY = (lat: number) => ((90 - lat) / 180) * 100;
 
   const userX = getX(userLoc.lng);
   const userY = getY(userLoc.lat);
   const satX = getX(satellite.longitude);
-  const satY = getY(0); // Geostationary is at equator
+  const satY = getY(0);
+
+  // D3 Signal Interference & Dynamic Heatmap Renderer
+  useEffect(() => {
+    if (!d3SvgRef.current || !mapRef.current) return;
+
+    const svg = d3.select(d3SvgRef.current);
+    const width = mapRef.current.clientWidth || 400;
+    const height = mapRef.current.clientHeight || 224;
+
+    svg.attr('width', width).attr('height', height);
+
+    // Clear previous D3 layers
+    svg.selectAll('.d3-heatmap-group').remove();
+    const g = svg.append('g').attr('class', 'd3-heatmap-group');
+
+    // Convert % coordinates to canvas pixels
+    const pxUserX = (userX / 100) * width;
+    const pxUserY = (userY / 100) * height;
+    const pxSatX = (satX / 100) * width;
+    const pxSatY = (satY / 100) * height;
+
+    const snrVal = telemetry ? parseFloat(telemetry.snr) : 16.0;
+    const isCritical = telemetry?.status === 'CRITICAL' || snrVal < 5;
+
+    // Interference Nodes Generation
+    const nodes: Array<{ x: number; y: number; val: number; r: number }> = [];
+
+    // Node 1: Jamming Emitter / User Interference center
+    const jamFactor = isJamming ? (jammingPower / 100) : 0.05;
+    const primaryRadius = Math.max(30, jamFactor * 140 + (isCritical ? 40 : 0));
+
+    nodes.push({
+      x: pxUserX,
+      y: pxUserY,
+      val: isJamming ? Math.min(1, 0.4 + jamFactor * 0.6) : (isCritical ? 0.7 : 0.2),
+      r: primaryRadius
+    });
+
+    // Node 2: Secondary Satellite Interference Footprint
+    nodes.push({
+      x: pxSatX,
+      y: pxSatY,
+      val: isJamming ? jamFactor * 0.5 : 0.15,
+      r: 80 + jamFactor * 40
+    });
+
+    // Random multipath interference nodes when jamming active
+    if (isJamming && jammingPower > 20) {
+      const extraCount = Math.floor(jammingPower / 25);
+      for (let i = 0; i < extraCount; i++) {
+        const angle = (i / extraCount) * Math.PI * 2;
+        const dist = 30 + i * 15;
+        nodes.push({
+          x: pxUserX + Math.cos(angle) * dist,
+          y: pxUserY + Math.sin(angle) * dist,
+          val: jamFactor * 0.6,
+          r: 25 + Math.random() * 20
+        });
+      }
+    }
+
+    // Color Scales using D3 Interpolators
+    const colorScale = d3.scaleSequential()
+      .domain([0, 1])
+      .interpolator(
+        isStealthMode
+          ? d3.interpolatePurples
+          : isJamming || isCritical
+          ? d3.interpolateYlOrRd
+          : d3.interpolateGnBu
+      );
+
+    // Create D3 SVG Radial Gradients dynamically
+    const defs = (svg.select('defs').empty() ? svg.append('defs') : svg.select('defs')) as any;
+    defs.selectAll('.d3-dyn-grad').remove();
+
+    nodes.forEach((node, idx) => {
+      const gradId = `d3-heat-grad-${idx}`;
+      const grad = defs.append('radialGradient')
+        .attr('id', gradId)
+        .attr('class', 'd3-dyn-grad')
+        .attr('cx', '50%')
+        .attr('cy', '50%')
+        .attr('r', '50%');
+
+      const coreColor = colorScale(node.val);
+      const outerColor = colorScale(Math.max(0, node.val - 0.4));
+
+      grad.append('stop')
+        .attr('offset', '0%')
+        .attr('stop-color', coreColor)
+        .attr('stop-opacity', isJamming ? 0.7 : 0.35);
+
+      grad.append('stop')
+        .attr('offset', '60%')
+        .attr('stop-color', outerColor)
+        .attr('stop-opacity', isJamming ? 0.3 : 0.1);
+
+      grad.append('stop')
+        .attr('offset', '100%')
+        .attr('stop-color', outerColor)
+        .attr('stop-opacity', 0);
+
+      // Render D3 Heatmap Circles
+      g.append('circle')
+        .attr('cx', node.x)
+        .attr('cy', node.y)
+        .attr('r', node.r)
+        .attr('fill', `url(#${gradId})`)
+        .style('mix-blend-mode', 'screen');
+    });
+
+    // Render Dynamic D3 Wave Front Contours if Jamming
+    if (isJamming) {
+      const contourGroup = g.append('g').attr('class', 'd3-contours');
+      const waveCount = Math.min(6, Math.floor(jammingPower / 15) + 2);
+
+      for (let w = 1; w <= waveCount; w++) {
+        const ringRadius = (w * 18) + ((Date.now() / 40) % 20);
+        contourGroup.append('circle')
+          .attr('cx', pxUserX)
+          .attr('cy', pxUserY)
+          .attr('r', ringRadius)
+          .attr('fill', 'none')
+          .attr('stroke', colorScale(0.8))
+          .attr('stroke-width', 1.2)
+          .attr('stroke-dasharray', `${w * 3} ${w * 2}`)
+          .attr('opacity', Math.max(0.1, 0.9 - (ringRadius / (primaryRadius + 40))));
+      }
+    }
+
+  }, [userX, userY, satX, satY, isJamming, jammingPower, telemetry, isStealthMode, heatmapMode]);
 
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!mapRef.current || !onLocChange) return;
@@ -31,11 +184,9 @@ export const TacticalMap: React.FC<Props> = ({ userLoc, satellite, isTracking, i
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
 
-    // Inverse mapping
     const lng = (x / 100) * 360 - 180;
     const lat = 90 - (y / 100) * 180;
 
-    // Disable tracking if user manually selects a point
     if (isTracking && onTrackingChange) {
       onTrackingChange(false);
     }
@@ -49,7 +200,7 @@ export const TacticalMap: React.FC<Props> = ({ userLoc, satellite, isTracking, i
     <div 
       ref={mapRef}
       onClick={handleMapClick}
-      className={`glass rounded-[2.5rem] p-6 border-2 border-slate-800 bg-slate-950/50 overflow-hidden relative h-56 group cursor-crosshair hover:border-red-500/30 transition-all duration-1000 shadow-2xl ${isStealthMode ? 'border-purple-900/40 shadow-[0_0_40px_rgba(168,85,247,0.1)]' : ''}`}
+      className={`glass rounded-[2.5rem] p-6 border-2 border-slate-800 bg-slate-950/50 overflow-hidden relative h-64 group cursor-crosshair hover:border-red-500/30 transition-all duration-1000 shadow-2xl ${isStealthMode ? 'border-purple-900/40 shadow-[0_0_40px_rgba(168,85,247,0.1)]' : ''}`}
     >
       <div className="absolute top-0 right-0 p-4 opacity-[0.02] pointer-events-none group-hover:opacity-5 transition-opacity">
          <div className="w-16 h-16 border-t-2 border-r-2 border-red-500 rounded-tr-3xl" />
@@ -63,9 +214,14 @@ export const TacticalMap: React.FC<Props> = ({ userLoc, satellite, isTracking, i
         }}></div>
       </div>
 
+      {/* D3 Heatmap SVG Overlay */}
+      <svg 
+        ref={d3SvgRef} 
+        className="absolute inset-0 w-full h-full pointer-events-none z-10"
+      />
+
       {/* Map Content */}
-      <div className="relative w-full h-full pointer-events-none">
-        {/* Connection Line & Heatmap */}
+      <div className="relative w-full h-full pointer-events-none z-20">
         <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
           <defs>
             <radialGradient id="coverageHeatmap" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
@@ -109,8 +265,8 @@ export const TacticalMap: React.FC<Props> = ({ userLoc, satellite, isTracking, i
           <line 
             x1={`${userX}%`} y1={`${userY}%`} 
             x2={`${satX}%`} y2={`${satY}%`} 
-            stroke={isStealthMode ? 'rgba(168, 85, 247, 0.4)' : 'rgba(34, 211, 238, 0.4)'} 
-            strokeWidth={isTracking ? "1.5" : "0.5"} 
+            stroke={isStealthMode ? 'rgba(168, 85, 247, 0.4)' : (isJamming ? 'rgba(239, 68, 68, 0.6)' : 'rgba(34, 211, 238, 0.4)')} 
+            strokeWidth={isTracking || isJamming ? "2" : "0.5"} 
             strokeDasharray={isTracking ? "None" : "4 2"}
             filter="url(#glow)"
           />
@@ -135,27 +291,58 @@ export const TacticalMap: React.FC<Props> = ({ userLoc, satellite, isTracking, i
         >
           {isTracking && (
             <>
-              <div className={`absolute inset-0 rounded-full animate-ping opacity-75 ${isStealthMode ? 'bg-purple-500' : 'bg-cyan-500'}`}></div>
-              <div className={`absolute -inset-2 border rounded-full animate-pulse ${isStealthMode ? 'border-purple-500/30' : 'border-cyan-500/30'}`}></div>
+              <div className={`absolute inset-0 rounded-full animate-ping opacity-75 ${isStealthMode ? 'bg-purple-500' : (isJamming ? 'bg-red-500' : 'bg-cyan-500')}`}></div>
+              <div className={`absolute -inset-2 border rounded-full animate-pulse ${isStealthMode ? 'border-purple-500/30' : (isJamming ? 'border-red-500/30' : 'border-cyan-500/30')}`}></div>
             </>
           )}
-          <div className={`absolute inset-0.5 rounded-full shadow-[0_0_8px_rgba(34,211,238,0.8)] border border-white/20 ${isStealthMode ? 'bg-purple-400 shadow-purple-500/80' : 'bg-cyan-400'}`}></div>
-          <span className={`absolute -bottom-4 left-1/2 -translate-x-1/2 text-[7px] font-bold uppercase whitespace-nowrap ${isStealthMode ? 'text-purple-400' : 'text-cyan-400'}`}>
-            {isTracking ? 'LIVE_FIX' : 'LOCAL_NODE'}
+          <div className={`absolute inset-0.5 rounded-full border border-white/20 ${isStealthMode ? 'bg-purple-400 shadow-purple-500/80' : (isJamming ? 'bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.9)]' : 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]')}`}></div>
+          <span className={`absolute -bottom-4 left-1/2 -translate-x-1/2 text-[7px] font-bold uppercase whitespace-nowrap ${isStealthMode ? 'text-purple-400' : (isJamming ? 'text-red-400' : 'text-cyan-400')}`}>
+            {isJamming ? 'EW_JAMMED_NODE' : (isTracking ? 'LIVE_FIX' : 'LOCAL_NODE')}
           </span>
         </div>
       </div>
 
-      {/* Coordinate HUD */}
-      <div className="absolute bottom-2 right-3 flex flex-col items-end pointer-events-none opacity-60">
-        <span className="text-[8px] font-mono text-slate-500">USER: {userLoc.lat.toFixed(4)}, {userLoc.lng.toFixed(4)}</span>
-        <span className="text-[8px] font-mono text-slate-500">SAT: 0.0000, {satellite.longitude.toFixed(4)}</span>
+      {/* Top Header with D3 Heatmap Toggle & PDF Export Button */}
+      <div className="absolute top-2 left-3 right-3 pointer-events-auto flex items-center justify-between z-30">
+        <div className="flex items-center space-x-2">
+          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">D3 Tactical Projection</span>
+          <div className="h-px w-6 bg-slate-800"></div>
+          <span className={`text-[7px] font-bold uppercase px-1.5 py-0.5 rounded ${isJamming ? 'bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse' : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'}`}>
+            {isJamming ? `D3 EW JAMMING HEATMAP (${jammingPower}%)` : 'D3 INTERFERENCE FIELD'}
+          </span>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <PDFExportButton
+            moduleName="Tactical Map & Signal Interference"
+            subtitle="D3.js Spatial Telemetry & EW Interference Plume Report"
+            userLoc={userLoc}
+            satelliteName={satellite.name}
+            satLongitude={satellite.longitude}
+            isJamming={isJamming}
+            jammingPower={jammingPower}
+            telemetry={telemetry}
+            details={[
+              { key: 'D3 Heatmap Engine', value: 'Active (Sequential Interpolation)' },
+              { key: 'Primary Emitter Node', value: `${userLoc.lat.toFixed(4)}°N, ${userLoc.lng.toFixed(4)}°W` },
+              { key: 'Target Orbital Slot', value: `${satellite.name} (${satellite.longitude}°E)` },
+              { key: 'EW Jamming Status', value: isJamming ? `ACTIVE at ${jammingPower}% output power` : 'INACTIVE' },
+              { key: 'SNR Quality Status', value: telemetry?.status || 'NOMINAL' }
+            ]}
+            size="sm"
+          />
+        </div>
       </div>
-      
-      <div className="absolute top-2 left-3 pointer-events-none flex items-center space-x-2">
-        <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Global Tactical Projection</span>
-        <div className="h-px w-8 bg-slate-800"></div>
-        <span className={`text-[7px] font-bold uppercase ${isStealthMode ? 'text-purple-500/50' : 'text-cyan-500/50'}`}>ASSET_COVERAGE_HEATMAP</span>
+
+      {/* Coordinate HUD & D3 Telemetry Indicator */}
+      <div className="absolute bottom-2 right-3 flex flex-col items-end pointer-events-none opacity-80 z-30">
+        <span className="text-[8px] font-mono text-slate-400">USER: {userLoc.lat.toFixed(4)}, {userLoc.lng.toFixed(4)}</span>
+        <span className="text-[8px] font-mono text-slate-400">SAT: 0.0000, {satellite.longitude.toFixed(4)}</span>
+        {isJamming && (
+          <span className="text-[8px] font-mono text-red-400 font-bold animate-pulse mt-0.5">
+            INTERFERENCE NOISE FLOOR: +{(jammingPower * 0.45).toFixed(1)} dB
+          </span>
+        )}
       </div>
     </div>
   );

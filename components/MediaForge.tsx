@@ -1,6 +1,5 @@
-
 import * as React from 'react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { generateTacticalImage, generateTacticalVideo, editTacticalImage } from '../services/geminiService.ts';
 
 type MediaMode = 'IMAGE_GEN' | 'VIDEO_GEN' | 'IMAGE_EDIT';
@@ -13,22 +12,8 @@ export const MediaForge: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [editSource, setEditSource] = useState<string | null>(null);
-  const [hasKey, setHasKey] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const checkKey = async () => {
-      const selected = await (window as any).aistudio?.hasSelectedApiKey();
-      setHasKey(!!selected);
-    };
-    checkKey();
-  }, []);
-
-  const handleKeySelect = async () => {
-    await (window as any).aistudio?.openSelectKey();
-    setHasKey(true);
-  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -44,10 +29,8 @@ export const MediaForge: React.FC = () => {
         url = await editTacticalImage(editSource, prompt);
       }
       setResultUrl(url);
-    } catch (err: any) {
-      if (err.message === "KEY_AUTH_FAILURE") {
-        handleKeySelect();
-      }
+    } catch (err) {
+      console.error("Media generation failed", err);
     } finally {
       setIsLoading(false);
     }
@@ -72,18 +55,7 @@ export const MediaForge: React.FC = () => {
         </div>
       </header>
 
-      {!hasKey && (
-        <div className="glass p-8 rounded-[2.5rem] border-amber-500/30 bg-amber-500/5 text-center space-y-4 mb-8">
-           <h3 className="text-sm font-black text-amber-500 uppercase tracking-widest">Advanced Media Hardware Locked</h3>
-           <p className="text-[11px] text-slate-400 max-w-md mx-auto">Generation via Veo and High-Quality Image models requires a paid project API key. Please select an authorized key to continue.</p>
-           <div className="flex flex-col items-center space-y-4">
-             <button onClick={handleKeySelect} className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-[10px] uppercase tracking-widest transition-all">Select Paid API Key</button>
-             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-[9px] text-slate-500 hover:text-amber-500 underline underline-offset-4 uppercase tracking-widest">Billing Documentation & Key Setup</a>
-           </div>
-        </div>
-      )}
-
-      <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 ${(!hasKey && (mode === 'VIDEO_GEN' || mode === 'IMAGE_EDIT')) ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-4 space-y-6">
            <div className="glass p-6 rounded-3xl border-slate-800 bg-slate-950/40">
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Forge Parameters</h3>
@@ -170,7 +142,7 @@ export const MediaForge: React.FC = () => {
                      <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
                      <div className="text-center space-y-1">
                         <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest animate-pulse">Neural Rendering in Progress</p>
-                        <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">Veo/Nano Engine Engaged</p>
+                        <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">Server-Side Gemini Engine Engaged</p>
                      </div>
                   </div>
                 ) : resultUrl ? (
@@ -181,7 +153,7 @@ export const MediaForge: React.FC = () => {
                   )
                 ) : (
                   <div className="text-center opacity-20 flex flex-col items-center">
-                     <svg className="w-24 h-24 text-slate-600 mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                     <svg className="w-24 h-24 text-slate-600 mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" /></svg>
                      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Awaiting Forge Command</p>
                   </div>
                 )}
